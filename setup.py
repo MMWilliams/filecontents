@@ -6,12 +6,12 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="filecontents",
     version="0.1.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="MMWilliams",
+    author_email="maureesewilliams@gmail.com",
     description="A library to extract file contents from directories",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/filecontents",
+    url="https://github.com/MMWilliams/filecontents",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
