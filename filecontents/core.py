@@ -20,6 +20,7 @@ def extract_file_contents(
     include_binary: bool = False,
     file_patterns: Optional[List[str]] = None,
     exclude_patterns: Optional[List[str]] = None,
+    skip_dirs: Optional[List[str]] = None,
     verbose: bool = False
 ) -> bool:
     """
@@ -32,6 +33,7 @@ def extract_file_contents(
         include_binary (bool): Whether to include binary files
         file_patterns (List[str], optional): List of file patterns to include (e.g., ["*.py", "*.txt"])
         exclude_patterns (List[str], optional): List of file patterns to exclude (e.g., ["*.log", "*.tmp"])
+        skip_dirs (List[str], optional): List of directory patterns to skip (e.g., ["node_modules", "__pycache__", "*.git"])
         verbose (bool): Whether to print detailed progress information
         
     Returns:
@@ -51,6 +53,7 @@ def extract_file_contents(
     # Compile file patterns if provided
     include_regex = None
     exclude_regex = None
+    skip_dirs_regex = None
     
     if file_patterns:
         pattern_strings = [pattern.replace('.', '\\.').replace('*', '.*') for pattern in file_patterns]
@@ -60,9 +63,14 @@ def extract_file_contents(
         pattern_strings = [pattern.replace('.', '\\.').replace('*', '.*') for pattern in exclude_patterns]
         exclude_regex = re.compile('|'.join(f'^{pattern}$' for pattern in pattern_strings))
     
+    if skip_dirs:
+        pattern_strings = [pattern.replace('.', '\\.').replace('*', '.*') for pattern in skip_dirs]
+        skip_dirs_regex = re.compile('|'.join(f'^{pattern}$' for pattern in pattern_strings))
+    
     # Initialize counters
     processed_files = 0
     skipped_files = 0
+    skipped_dirs_count = 0
     
     try:
         with open(output_file, 'w', encoding='utf-8') as out_f:
@@ -127,11 +135,28 @@ def extract_file_contents(
                     logger.error(f"Error processing {file_path}: {e}")
                     skipped_files += 1
             
+            # Function to check if a directory should be skipped
+            def should_skip_directory(dir_name: str) -> bool:
+                nonlocal skipped_dirs_count
+                
+                # Skip hidden directories
+                if dir_name.startswith('.'):
+                    return True
+                
+                # Skip directories matching skip patterns
+                if skip_dirs_regex and skip_dirs_regex.match(dir_name):
+                    logger.info(f"Skipping directory (matches skip pattern): {dir_name}")
+                    skipped_dirs_count += 1
+                    return True
+                
+                return False
+            
             # Process directory
             if recursive:
                 for root, dirs, files in os.walk(dir_path):
-                    # Skip hidden directories
-                    dirs[:] = [d for d in dirs if not d.startswith('.')]
+                    # Filter out directories that should be skipped
+                    # We need to modify dirs in-place to prevent os.walk from descending into them
+                    dirs[:] = [d for d in dirs if not should_skip_directory(d)]
                     
                     # Process each file in the current directory
                     logger.debug(f"Processing directory: {root}")
@@ -139,7 +164,7 @@ def extract_file_contents(
                         if not file.startswith('.'):  # Skip hidden files
                             process_file(Path(root) / file)
                     
-                    # Print subdirectory info to output file
+                    # Print subdirectory info to output file (only for directories that weren't skipped)
                     if dirs:
                         subdirs = ", ".join(dirs)
                         out_f.write(f"\n{'=' * 80}\n")
@@ -151,7 +176,7 @@ def extract_file_contents(
                 for item in dir_path.iterdir():
                     if item.is_file() and not item.name.startswith('.'):  # Skip hidden files
                         process_file(item)
-                    elif item.is_dir():
+                    elif item.is_dir() and not should_skip_directory(item.name):
                         out_f.write(f"\n{'=' * 80}\n")
                         out_f.write(f"SUBDIRECTORY (not processed): {item}\n")
                         out_f.write(f"{'=' * 80}\n\n")
@@ -159,6 +184,7 @@ def extract_file_contents(
             logger.info(f"\nAll file contents have been written to {output_file}")
             logger.info(f"Files processed: {processed_files}")
             logger.info(f"Files skipped: {skipped_files}")
+            logger.info(f"Directories skipped: {skipped_dirs_count}")
             return True
             
     except Exception as e:

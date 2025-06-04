@@ -27,6 +27,10 @@ def main():
     parser.add_argument("-e", "--exclude", action="append", metavar="PATTERN",
                         help="Exclude files matching the pattern (e.g., '*.log'). Can be specified multiple times.")
     
+    # Directory filtering options
+    parser.add_argument("-s", "--skip-dirs", action="append", metavar="PATTERN",
+                        help="Skip directories matching the pattern (e.g., 'node_modules', '__pycache__', '*.git'). Can be specified multiple times.")
+    
     # Output options
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="Enable verbose output")
@@ -51,6 +55,7 @@ def main():
         include_binary=args.include_binary,
         file_patterns=args.include,
         exclude_patterns=args.exclude,
+        skip_dirs=args.skip_dirs,
         verbose=args.verbose
     )
     
